@@ -24,6 +24,10 @@ function applyEffects(room: GameRoom, effects: Effect[]): void {
 const app = express();
 app.use(express.json());
 
+app.get("/health", (_req: Request, res: Response) => {
+  res.json({ ok: true });
+});
+
 app.post("/register", (req: Request, res: Response) => {
   const name = String(req.body?.name ?? "Player");
   res.json(lobby.register(name));

@@ -47,6 +47,7 @@
       <h2>Connect</h2>
       <p>Coordinator URL: <input id="serverUrl" value="https://relay20.onrender.com" size="40" /></p>
       <p>Your name: <input id="name" placeholder="Alice" /></p>
+      <p><button id="testBtn">Test connection</button> <span id="testResult"></span></p>
       <button id="connectBtn">Connect</button>
     </section>
 
@@ -83,9 +84,9 @@
         </div>
       </div>
       <p>
-        <input id="actionText" size="50" placeholder="Ask a yes/no question…" />
-        <button id="askBtn">Ask</button>
-        <button id="guessBtn">Guess</button>
+        <input id="actionText" size="50" placeholder="Ask a yes/no question…" disabled />
+        <button id="askBtn" disabled>Ask</button>
+        <button id="guessBtn" disabled>Guess</button>
       </p>
     </section>
 

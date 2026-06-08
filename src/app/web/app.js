@@ -3,6 +3,7 @@ const show = (id) => $(id).classList.remove("hidden");
 const hide = (id) => $(id).classList.add("hidden");
 
 const me = { slot: null };
+let started = false; // becomes true once the game is in-progress; guards the waiting-screen override
 
 async function post(path, body) {
   const res = await fetch(path, {
@@ -86,6 +87,10 @@ function enterGame() {
   hide("result");
   show("game");
   setupColumns();
+  // Lock inputs by default; setTurn() re-enables them when it's this player's turn.
+  $("askBtn").disabled = true;
+  $("guessBtn").disabled = true;
+  $("actionText").disabled = true;
 }
 
 function resultSummary(results) {
@@ -106,6 +111,7 @@ function handleEvent(e) {
   switch (e.type) {
     case "snapshot":
       if (e.snapshot.phase === "in-progress") {
+        started = true;
         enterGame();
         clearThreads();
         for (const h of e.snapshot.history) {
@@ -124,6 +130,7 @@ function handleEvent(e) {
       show("secret");
       break;
     case "enterSecret":
+      started = false;
       $("category").textContent = e.category;
       setThinking(null);
       hide("game");
@@ -131,6 +138,7 @@ function handleEvent(e) {
       show("secret");
       break;
     case "turnChanged":
+      started = true;
       enterGame();
       setThinking(null);
       renderRemaining(e.remaining);
@@ -160,6 +168,7 @@ function handleEvent(e) {
       if (e.slot === me.slot) setThinking(null);
       break;
     case "gameOver":
+      started = false;
       setThinking(null);
       hide("game");
       show("result");
@@ -180,6 +189,7 @@ function handleEvent(e) {
       setTurn(e.slot);
       break;
     case "rematch":
+      started = false;
       setThinking(null);
       hide("result");
       clearThreads();
@@ -201,6 +211,17 @@ new EventSource("/local/stream").onmessage = (ev) => {
   handleEvent(e);
 };
 
+$("testBtn").onclick = async () => {
+  $("testResult").textContent = "testing… (a sleeping server can take ~30–60s to wake up)";
+  try {
+    const r = await post("/local/ping", { serverUrl: $("serverUrl").value });
+    $("testResult").textContent = r.ok
+      ? `✓ reachable (${r.ms}ms)`
+      : `✗ not reachable: ${r.error || "HTTP " + r.status} (after ${r.ms}ms)`;
+  } catch (e) {
+    $("testResult").textContent = "✗ " + e.message;
+  }
+};
 $("connectBtn").onclick = async () => {
   await post("/local/connect", { serverUrl: $("serverUrl").value, name: $("name").value || "Player" });
   hide("connect");
@@ -218,9 +239,11 @@ $("joinBtn").onclick = async () => {
 };
 $("secretBtn").onclick = async () => {
   await post("/local/secret", { secret: $("secretInput").value });
-  enterGame();
-  $("turnBanner").className = "banner their-turn";
-  $("turnBanner").textContent = "Secret set — waiting for the other player…";
+  if (!started) {
+    enterGame();
+    $("turnBanner").className = "banner their-turn";
+    $("turnBanner").textContent = "Secret set — waiting for the other player…";
+  }
 };
 $("askBtn").onclick = async () => {
   const text = $("actionText").value.trim();

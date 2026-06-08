@@ -94,6 +94,24 @@ app.get("/local/stream", (_req: Request, res: Response) => {
   res.on("close", () => browserClients.delete(res));
 });
 
+app.post("/local/ping", async (req: Request, res: Response) => {
+  const url = String(req.body?.serverUrl ?? "").replace(/\/$/, "");
+  if (!url) {
+    res.status(400).json({ ok: false, error: "no server URL" });
+    return;
+  }
+  const started = Date.now();
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 70000);
+    const r = await fetch(`${url}/health`, { signal: ctrl.signal });
+    clearTimeout(timer);
+    res.json({ ok: r.ok, status: r.status, ms: Date.now() - started });
+  } catch (e) {
+    res.json({ ok: false, error: (e as Error).message, ms: Date.now() - started });
+  }
+});
+
 app.post("/local/connect", async (req: Request, res: Response) => {
   try {
     state.serverUrl = String(req.body?.serverUrl);
