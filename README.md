@@ -30,7 +30,7 @@ Each turn: you ask a question → it runs on your **opponent's** node (the secre
 
 ## Prerequisites
 
-- **Node 22** (the app runs TypeScript via `tsx`).
+- **Node 18+** — any current LTS works (Node 20 or 22 recommended). The app runs TypeScript via `tsx`.
 - An **authenticated Claude Code** on each player's machine — the brain node uses its ambient credentials (no API key needed). Or run with `--mock` for a token-free demo with a deterministic fake brain.
 
 ## Run the coordinator
