@@ -7,21 +7,49 @@ export interface Brain {
   checkGuess(secret: string, guess: string): Promise<{ correct: boolean }>;
 }
 
-// Collects the final assistant text from one Agent SDK query.
-async function runClaude(prompt: string): Promise<string> {
-  let text = "";
-  for await (const message of query({ prompt })) {
-    // The SDK emits a final "result" message with the full text. Concatenate
-    // any assistant text we see; prefer the explicit result if present.
-    const anyMsg = message as any;
-    if (anyMsg.type === "result" && typeof anyMsg.result === "string") return anyMsg.result;
-    if (anyMsg.type === "assistant" && anyMsg.message?.content) {
-      for (const block of anyMsg.message.content) {
-        if (block.type === "text") text += block.text;
+// Runs one Agent SDK query. When opts.stream is set, streams the answer to
+// stdout live (so the operator watches their Claude produce it); always returns
+// the final text. Falls back to printing the full answer once if the installed
+// SDK build doesn't surface partial messages.
+async function runClaude(prompt: string, opts: { stream?: boolean } = {}): Promise<string> {
+  let assistantText = "";
+  let resultText = "";
+  let printedAny = false;
+  const useStream = opts.stream === true;
+
+  const q = useStream
+    ? query({ prompt, options: { includePartialMessages: true } })
+    : query({ prompt });
+
+  for await (const message of q) {
+    const m = message as any;
+    if (useStream && m.type === "stream_event") {
+      const delta = m.event?.delta?.text;
+      if (typeof delta === "string" && delta.length) {
+        if (!printedAny) {
+          process.stdout.write("[claude] ");
+          printedAny = true;
+        }
+        process.stdout.write(delta);
+      }
+      continue;
+    }
+    if (m.type === "assistant" && m.message?.content) {
+      for (const block of m.message.content) {
+        if (block.type === "text") assistantText += block.text;
       }
     }
+    if (m.type === "result" && typeof m.result === "string") {
+      resultText = m.result;
+    }
   }
-  return text.trim();
+
+  const final = (resultText || assistantText).trim();
+  if (useStream) {
+    if (!printedAny && final) process.stdout.write(`[claude] ${final}`);
+    process.stdout.write("\n");
+  }
+  return final;
 }
 
 function extractJson(s: string): any {
@@ -40,6 +68,7 @@ export class ClaudeBrain implements Brain {
       `You are the secret-keeper in a game of 20 Questions. Your secret is "${secret}". ` +
         `Answer the following question truthfully and briefly (a yes/no plus at most one short clause). ` +
         `Never reveal or spell out the secret itself. Question: ${question}`,
+      { stream: true },
     );
     return { answer: out || "I'm not sure." };
   }
@@ -63,6 +92,7 @@ export class ClaudeBrain implements Brain {
     const out = await runClaude(
       `Your secret is "${secret}". A player guessed "${guess}". ` +
         `Is the guess correct (allow reasonable synonyms / close phrasing)? Reply with ONLY the word yes or no.`,
+      { stream: true },
     );
     return { correct: /\byes\b/i.test(out) };
   }

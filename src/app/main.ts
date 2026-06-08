@@ -41,16 +41,27 @@ const getBrain = () => (brainPromise ??= loadBrain());
 async function runJob(job: JobAssignment): Promise<void> {
   const brain = await getBrain();
   const started = Date.now();
+  const p = job.payload;
+  if (p.kind === "answer") {
+    console.log(`\n[brain] ❓ Your opponent asked: "${p.question}"`);
+    console.log(`[brain]    → running it on this machine's Claude…`);
+  } else if (p.kind === "analyze") {
+    const n = p.history.length;
+    console.log(`\n[brain] 🧠 Your Claude is reviewing the answers so far (${n} exchange${n === 1 ? "" : "s"})…`);
+  } else {
+    console.log(`\n[brain] 🎯 Your opponent guessed: "${p.guess}" — your Claude is checking…`);
+  }
   try {
     let data: JobResultData;
-    if (job.payload.kind === "answer") {
-      const secret = secrets.get() ?? "";
-      data = { kind: "answer", ...(await brain.answer(secret, job.payload.question)) };
-    } else if (job.payload.kind === "analyze") {
-      data = { kind: "analyze", ...(await brain.analyze(job.payload.history)) };
+    if (p.kind === "answer") {
+      data = { kind: "answer", ...(await brain.answer(secrets.get() ?? "", p.question)) };
+      console.log(`[brain] ↳ answered "${data.answer}" (${Date.now() - started}ms)`);
+    } else if (p.kind === "analyze") {
+      data = { kind: "analyze", ...(await brain.analyze(p.history)) };
+      console.log(`[brain] ↳ suggested ${data.candidates.length} candidate(s) (${Date.now() - started}ms)`);
     } else {
-      const secret = secrets.get() ?? "";
-      data = { kind: "check-guess", ...(await brain.checkGuess(secret, job.payload.guess)) };
+      data = { kind: "check-guess", ...(await brain.checkGuess(secrets.get() ?? "", p.guess)) };
+      console.log(`[brain] ↳ guess is ${data.correct ? "CORRECT ✅" : "wrong"} (${Date.now() - started}ms)`);
     }
     await state.client!.postResult(state.nodeId, { jobId: job.jobId, ok: true, latencyMs: Date.now() - started, data });
   } catch (e) {
@@ -58,6 +69,7 @@ async function runJob(job: JobAssignment): Promise<void> {
     const hint = /auth|login|credential|api[_ ]?key|unauthor|forbidden|401|403/i.test(msg)
       ? " — is Claude Code logged in on this machine? (or restart the app with --mock)"
       : "";
+    console.error(`[brain] ⚠️ Claude failed: ${msg}`);
     await state.client!.postResult(state.nodeId, { jobId: job.jobId, ok: false, latencyMs: Date.now() - started, error: msg + hint });
   }
 }
