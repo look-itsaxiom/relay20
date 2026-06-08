@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Relay — 20 Questions over a brain pool</title>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
+      .hidden { display: none; }
+      input, button { font-size: 1rem; padding: 0.4rem 0.6rem; }
+      .code { font-size: 1.5rem; letter-spacing: 0.2em; font-weight: 700; }
+
+      .banner {
+        font-size: 1.1rem; font-weight: 700; text-align: center;
+        padding: 0.7rem; border-radius: 8px; margin: 0.5rem 0 1rem;
+        border: 2px solid transparent;
+      }
+      .banner.your-turn { background: #e7f8ec; color: #11703a; border-color: #2fae66; }
+      .banner.their-turn { background: #f1f1f3; color: #555; }
+
+      .thinking { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #555; margin: -0.5rem 0 0.8rem; }
+      .spinner { width: 14px; height: 14px; border: 2px solid #d7d7d7; border-top-color: #2fae66; border-radius: 50%; animation: spin 0.8s linear infinite; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+      .col { border: 2px solid #ddd; border-radius: 10px; padding: 0.6rem; background: #fafafa; transition: all 0.15s; }
+      .col.active { border-color: #2fae66; background: #f3fcf6; box-shadow: 0 0 0 3px rgba(47,174,102,0.15); }
+      .col.resolved { opacity: 0.78; }
+      .col h3 { margin: 0 0 0.1rem; font-size: 0.95rem; display: flex; align-items: center; gap: 0.4rem; }
+      .col .sub { font-size: 0.72rem; color: #777; }
+      .col .left { font-size: 0.8rem; font-weight: 700; color: #b2542b; margin: 0.15rem 0 0.5rem; }
+      .status { font-size: 0.68rem; padding: 0.05rem 0.45rem; border-radius: 999px; font-weight: 700; }
+      .status.won { background: #e7f8ec; color: #11703a; }
+      .status.lost { background: #fdeaea; color: #a11a1a; }
+      .thread { min-height: 200px; }
+
+      .msg { margin: 0.3rem 0; padding: 0.35rem 0.55rem; border-radius: 6px; background: #fff; border: 1px solid #eee; }
+      .msg.ai { background: #eef6ff; border-color: #d6e8fb; }
+      .who { font-size: 0.7rem; color: #666; text-transform: uppercase; letter-spacing: 0.04em; }
+    </style>
+  </head>
+  <body>
+    <h1>Relay</h1>
+    <p>20 Questions where every answer runs on the <em>other</em> player's machine.</p>
+
+    <section id="connect">
+      <h2>Connect</h2>
+      <p>Coordinator URL: <input id="serverUrl" placeholder="https://…" size="40" /></p>
+      <p>Your name: <input id="name" placeholder="Alice" /></p>
+      <button id="connectBtn">Connect</button>
+    </section>
+
+    <section id="lobby" class="hidden">
+      <h2>Lobby</h2>
+      <button id="createBtn">Create game</button>
+      <span> or join by code: </span>
+      <input id="joinCode" placeholder="ABCD" maxlength="4" />
+      <button id="joinBtn">Join</button>
+      <p id="codeLine" class="hidden">Share this code: <span id="code" class="code"></span></p>
+    </section>
+
+    <section id="secret" class="hidden">
+      <h2>Pick your secret</h2>
+      <p>Your <strong id="category">person, place, or thing</strong> — stays on this machine, never sent to the server.</p>
+      <input id="secretInput" size="40" /> <button id="secretBtn">Ready</button>
+    </section>
+
+    <section id="game" class="hidden">
+      <div id="turnBanner" class="banner their-turn">Waiting…</div>
+      <div id="thinking" class="thinking hidden"><span class="spinner"></span> <span id="thinkingText"></span></div>
+      <div class="cols">
+        <div id="colP1" class="col">
+          <h3><span id="nameP1">Player 1</span> <span class="status" id="statusP1"></span></h3>
+          <div class="sub" id="subP1"></div>
+          <div class="left" id="leftP1"></div>
+          <div class="thread" id="threadP1"></div>
+        </div>
+        <div id="colP2" class="col">
+          <h3><span id="nameP2">Player 2</span> <span class="status" id="statusP2"></span></h3>
+          <div class="sub" id="subP2"></div>
+          <div class="left" id="leftP2"></div>
+          <div class="thread" id="threadP2"></div>
+        </div>
+      </div>
+      <p>
+        <input id="actionText" size="50" placeholder="Ask a yes/no question…" />
+        <button id="askBtn">Ask</button>
+        <button id="guessBtn">Guess</button>
+      </p>
+    </section>
+
+    <section id="result" class="hidden">
+      <h2 id="winner"></h2>
+      <div id="reveals"></div>
+      <button id="rematchBtn">Rematch</button>
+    </section>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
