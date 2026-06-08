@@ -63,6 +63,7 @@ export type ServerEvent =
   | { type: "turnChanged"; turn: PlayerSlot; remaining: Record<PlayerSlot, number> }
   | { type: "gameOver"; results: Record<PlayerSlot, PlayerResult> }
   | { type: "playerResolved"; slot: PlayerSlot; result: PlayerResult; remaining: Record<PlayerSlot, number> }
+  | { type: "actionFailed"; slot: PlayerSlot; reason: string; remaining: Record<PlayerSlot, number> }
   | { type: "secretRevealed"; slot: PlayerSlot; secret: string }
   | { type: "rematch" }
   | { type: "playerLeft"; slot: PlayerSlot };

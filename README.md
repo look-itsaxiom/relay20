@@ -61,6 +61,11 @@ npm run app              # opens a local browser UI; add --mock for no-LLM mode
 
 In the UI: enter the coordinator's URL + your name → one player **Create game** (shares the 4-letter code), the other **Join** with it → each picks a secret (stays local) and clicks Ready → take turns asking and guessing.
 
+## Troubleshooting
+
+- **"AI unavailable" mid-game:** the named player's machine needs an authenticated Claude Code — the brain uses its ambient credentials. Run `claude` and log in, then retry the turn (your question is refunded automatically). The app's UI works without Claude; the brain is only invoked when it's a node's turn to answer/analyze, so a missing login surfaces as a clear in-game error, not a crash or a hang.
+- **No Claude at all?** Start the app with `npm run app -- --mock` to play with a deterministic fake brain — no Claude, no tokens.
+
 ## Layout
 
 - `src/coordinator/` — the coordinator: `game.ts` (pure state machine), `lobby.ts` (join-by-code), `main.ts` (HTTP + SSE).

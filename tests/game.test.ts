@@ -124,6 +124,31 @@ describe("GameRoom", () => {
     expect(over).toMatchObject({ results: { P1: "lost", P2: "lost" } });
   });
 
+  it("surfaces an error, refunds the question, and keeps the turn when the keeper's AI fails", () => {
+    const room = start();
+    const askFx = room.action("nodeA", "ask", "Is it alive?");
+    expect(room.remaining.P1).toBe(19);
+    const jobId = routes(askFx)[0].jobId;
+    const fx = room.jobResult({ jobId, ok: false, latencyMs: 1, error: "not logged in" });
+    expect(room.remaining.P1).toBe(20); // refunded
+    expect(room.turn).toBe("P1"); // still the asker's turn
+    expect(broadcasts(fx).find((e) => e.type === "actionFailed")).toMatchObject({ slot: "P1" });
+    // turn-lock released — the asker can act again
+    expect(() => room.action("nodeA", "ask", "another?")).not.toThrow();
+  });
+
+  it("still passes the turn if only the analyze step fails (the answer already happened)", () => {
+    const room = start();
+    const askFx = room.action("nodeA", "ask", "Is it alive?");
+    const answerJob = routes(askFx)[0].jobId;
+    const afterAnswer = room.jobResult({ jobId: answerJob, ok: true, latencyMs: 1, data: { kind: "answer", answer: "Yes" } });
+    const analyzeJob = routes(afterAnswer)[0].jobId;
+    const fx = room.jobResult({ jobId: analyzeJob, ok: false, latencyMs: 1, error: "boom" });
+    expect(room.turn).toBe("P2"); // turn still passes
+    expect(room.history).toHaveLength(1); // answer committed
+    expect(broadcasts(fx).map((e) => e.type)).toContain("analysis"); // soft analysis emitted
+  });
+
   it("rejects an action when it is not your turn", () => {
     const room = start();
     expect(() => room.action("nodeB", "ask", "Is it alive?")).toThrow();

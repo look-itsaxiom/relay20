@@ -54,7 +54,11 @@ async function runJob(job: JobAssignment): Promise<void> {
     }
     await state.client!.postResult(state.nodeId, { jobId: job.jobId, ok: true, latencyMs: Date.now() - started, data });
   } catch (e) {
-    await state.client!.postResult(state.nodeId, { jobId: job.jobId, ok: false, latencyMs: Date.now() - started, error: (e as Error).message });
+    const msg = (e as Error).message;
+    const hint = /auth|login|credential|api[_ ]?key|unauthor|forbidden|401|403/i.test(msg)
+      ? " — is Claude Code logged in on this machine? (or restart the app with --mock)"
+      : "";
+    await state.client!.postResult(state.nodeId, { jobId: job.jobId, ok: false, latencyMs: Date.now() - started, error: msg + hint });
   }
 }
 
@@ -145,5 +149,10 @@ app.post("/local/rematch", async (_req: Request, res: Response) => {
 const url = `http://localhost:${LOCAL_PORT}`;
 app.listen(LOCAL_PORT, () => {
   console.log(`[app] UI on ${url}${USE_MOCK ? " (mock brain)" : ""}`);
+  if (!USE_MOCK) {
+    console.log(
+      "[app] AI runs on this machine's authenticated Claude Code. If you see \"AI unavailable\" errors, run `claude` and log in — or restart with --mock for a no-LLM demo.",
+    );
+  }
   if (!process.argv.includes("--no-open")) void open(url);
 });

@@ -22,11 +22,15 @@ interface PlayerState {
 interface PendingJob {
   kind: "answer" | "analyze" | "check-guess";
   askerSlot: PlayerSlot;
-  text?: string; // the question or guess
+  text?: string;
 }
 
 const CATEGORY = "person, place, or thing";
 const QUESTION_BUDGET = 20;
+
+function label(slot: PlayerSlot): string {
+  return slot === "P1" ? "Player 1" : "Player 2";
+}
 
 export class GameRoom {
   readonly gameId: string;
@@ -120,8 +124,12 @@ export class GameRoom {
     this.pending.delete(res.jobId);
     const asker = p.askerSlot;
     const keeperSlot = this.opp(asker);
+    const failed = !res.ok || !res.data;
 
-    if (p.kind === "answer" && res.data?.kind === "answer") {
+    if (p.kind === "answer") {
+      if (failed || res.data?.kind !== "answer") {
+        return this.failAction(asker, `${label(keeperSlot)}'s AI couldn't answer: ${res.error ?? "unknown error"}`);
+      }
       const answer = res.data.answer;
       this.pendingHistory = [...this.history, { askedBy: asker, question: p.text!, answer }];
       const jobId = this.nextId();
@@ -138,27 +146,46 @@ export class GameRoom {
       ];
     }
 
-    if (p.kind === "analyze" && res.data?.kind === "analyze") {
+    if (p.kind === "analyze") {
+      // The question was already answered; analysis is best-effort. Commit history and pass the turn either way.
       this.history = this.pendingHistory ?? this.history;
       this.pendingHistory = undefined;
+      const a =
+        !failed && res.data?.kind === "analyze"
+          ? res.data
+          : { candidates: [] as string[], followups: [] as string[], note: "(analysis unavailable)" };
       const fx: Effect[] = [
-        { kind: "broadcast", event: { type: "analysis", forSlot: asker, candidates: res.data.candidates, followups: res.data.followups } },
+        { kind: "broadcast", event: { type: "analysis", forSlot: asker, candidates: a.candidates, followups: a.followups } },
       ];
       return [...fx, ...this.resolveTurn(asker, false)];
     }
 
-    if (p.kind === "check-guess" && res.data?.kind === "check-guess") {
+    if (p.kind === "check-guess") {
+      if (failed || res.data?.kind !== "check-guess") {
+        return this.failAction(asker, `${label(keeperSlot)}'s AI couldn't check your guess: ${res.error ?? "unknown error"}`);
+      }
       const correct = res.data.correct;
-      const fx: Effect[] = [
+      return [
         { kind: "broadcast", event: { type: "guessResult", bySlot: asker, guess: p.text!, correct } },
+        ...this.resolveTurn(asker, correct),
       ];
-      return [...fx, ...this.resolveTurn(asker, correct)];
     }
 
     return [];
   }
 
-  // Called when the current player's action (ask or guess) has fully resolved.
+  // A node's AI failed to produce a result. Refund the consumed question, clear
+  // the turn-lock, keep the turn with the asker so they can retry, and surface why.
+  private failAction(asker: PlayerSlot, reason: string): Effect[] {
+    this.busy = false;
+    this.remaining[asker] += 1;
+    this.pendingHistory = undefined;
+    this.turn = asker;
+    return [
+      { kind: "broadcast", event: { type: "actionFailed", slot: asker, reason, remaining: { ...this.remaining } } },
+    ];
+  }
+
   private resolveTurn(asker: PlayerSlot, didWin: boolean): Effect[] {
     this.busy = false;
     const fx: Effect[] = [];

@@ -173,6 +173,12 @@ function handleEvent(e) {
       $("reveals").appendChild(p);
       break;
     }
+    case "actionFailed":
+      setThinking(null);
+      renderRemaining(e.remaining);
+      addMsg(e.slot, "⚠️ AI unavailable", e.reason);
+      setTurn(e.slot);
+      break;
     case "rematch":
       setThinking(null);
       hide("result");
