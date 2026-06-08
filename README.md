@@ -4,6 +4,22 @@ A 2-player game of **20 Questions** where every question you ask is answered by 
 
 Your secret never leaves your machine. The coordinator literally cannot answer a question — it has no LLM and no secret — so it must route the work to your opponent's node. That's the whole point.
 
+## Play (one command — no clone)
+
+You need **Node 18+** and an authenticated **Claude Code** (run `claude` once to log in). Then:
+
+```bash
+npx github:look-itsaxiom/relay20
+```
+
+A browser opens to the game with the coordinator URL pre-filled. One player clicks **Create game** and shares the 4-letter code; the other clicks **Join** and enters it. Each picks a secret, hits Ready, then you take turns.
+
+No Claude on hand? Run a deterministic, no-LLM demo:
+
+```bash
+npx github:look-itsaxiom/relay20 --mock
+```
+
 ## How it works
 
 ```

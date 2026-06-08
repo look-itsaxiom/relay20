@@ -5,6 +5,9 @@
   "engines": {
     "node": ">=18"
   },
+  "bin": {
+    "relay20": "bin/relay20.mjs"
+  },
   "scripts": {
     "coordinator": "tsx src/coordinator/main.ts",
     "start": "tsx src/coordinator/main.ts",
