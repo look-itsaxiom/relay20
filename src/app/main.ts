@@ -106,7 +106,10 @@ app.post("/local/ping", async (req: Request, res: Response) => {
     const timer = setTimeout(() => ctrl.abort(), 70000);
     const r = await fetch(`${url}/health`, { signal: ctrl.signal });
     clearTimeout(timer);
-    res.json({ ok: r.ok, status: r.status, ms: Date.now() - started });
+    // Any HTTP response means the host is reachable — even a 404 from an older
+    // deploy that predates /health. Only a network error/timeout (the catch
+    // below) counts as not reachable.
+    res.json({ ok: true, status: r.status, ms: Date.now() - started });
   } catch (e) {
     res.json({ ok: false, error: (e as Error).message, ms: Date.now() - started });
   }
