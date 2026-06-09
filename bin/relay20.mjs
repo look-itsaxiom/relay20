@@ -1,18 +1,12 @@
 #!/usr/bin/env node
-// Entry point for `npx github:look-itsaxiom/relay20` — launches the player app
-// (local game UI + this machine's Claude brain node) using the bundled tsx runtime.
-import { spawn } from "node:child_process";
+// Entry for `npx github:look-itsaxiom/relay20`. Registers the tsx loader
+// IN-PROCESS (via a static import that resolves tsx relative to THIS package,
+// not the user's cwd), then runs the TypeScript player-app entry. This avoids
+// the `--import tsx` cwd-resolution trap that broke npx on a fresh machine.
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { register } from "tsx/esm/api";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const appEntry = join(root, "src", "app", "main.ts");
-
-const child = spawn(process.execPath, ["--import", "tsx", appEntry, ...process.argv.slice(2)], {
-  stdio: "inherit",
-});
-child.on("exit", (code) => process.exit(code ?? 0));
-child.on("error", (err) => {
-  console.error("Failed to launch relay20:", err.message);
-  process.exit(1);
-});
+register();
+await import(pathToFileURL(join(root, "src", "app", "main.ts")).href);
