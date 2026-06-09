@@ -14,9 +14,13 @@ function send(nodeId: NodeId, event: ServerEvent): void {
 function applyEffects(room: GameRoom, effects: Effect[]): void {
   for (const fx of effects) {
     if (fx.kind === "routeJob") {
+      const open = streams.has(fx.job.targetNodeId);
+      console.log(`[coordinator] → job ${fx.job.payload.kind} to ${fx.job.targetNodeId} (stream ${open ? "open" : "MISSING"})`);
       send(fx.job.targetNodeId, { type: "jobAssigned", job: fx.job });
     } else {
-      for (const nodeId of room.nodeIds()) send(nodeId, fx.event);
+      const targets = room.nodeIds();
+      console.log(`[coordinator] ⇉ ${fx.event.type} → ${targets.length} player(s)`);
+      for (const nodeId of targets) send(nodeId, fx.event);
     }
   }
 }
@@ -96,8 +100,11 @@ app.post("/games/:id/rematch", (req: Request, res: Response) => {
 app.post("/jobs/:jobId/result", (req: Request, res: Response) => {
   const result = req.body as JobResult;
   result.jobId = String(req.params.jobId);
-  const gameId = lobby.gameIdForNode(String(req.body?.nodeId));
+  const nodeId = String(req.body?.nodeId);
+  const gameId = lobby.gameIdForNode(nodeId);
   const room = gameId ? lobby.get(gameId) : undefined;
+  const kind = (result.data as { kind?: string } | undefined)?.kind ?? "?";
+  console.log(`[coordinator] ← result job=${result.jobId} from=${nodeId} ok=${result.ok} kind=${kind} room=${room ? "found" : "NOT FOUND (state lost?)"}`);
   res.json({ ok: true });
   if (room) applyEffects(room, room.jobResult(result));
 });
@@ -113,6 +120,7 @@ app.get("/games/:id/stream", (req: Request, res: Response) => {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache",
     Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
   });
   const snapshot = room.snapshot();
   res.write(`data: ${JSON.stringify({ type: "snapshot", snapshot })}\n\n`);
@@ -124,9 +132,27 @@ app.get("/games/:id/stream", (req: Request, res: Response) => {
     res.write(`data: ${JSON.stringify({ type: "gameStarted" })}\n\n`);
   }
   streams.set(nodeId, res);
+  console.log(`[coordinator] stream connected: ${nodeId} (game ${room.gameId}, phase ${snapshot.phase})`);
+
+  // Keepalive: stop proxies (e.g. Render) from culling an idle SSE connection.
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(`: ping\n\n`);
+    } catch {
+      /* connection already gone */
+    }
+  }, 15000);
+  if (typeof heartbeat.unref === "function") heartbeat.unref();
+
   req.on("close", () => {
-    streams.delete(nodeId);
-    applyEffects(room, room.playerLeft(nodeId));
+    clearInterval(heartbeat);
+    // Only remove if this is still the current stream for the node — a reconnect
+    // may have already registered a fresh one. Do NOT end the game on a transient
+    // close; the client auto-reconnects and re-syncs from the snapshot.
+    if (streams.get(nodeId) === res) {
+      streams.delete(nodeId);
+    }
+    console.log(`[coordinator] stream closed: ${nodeId}`);
   });
 });
 

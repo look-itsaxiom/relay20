@@ -128,8 +128,24 @@ app.post("/local/connect", async (req: Request, res: Response) => {
 
 function startStream() {
   state.abort?.abort();
-  state.abort = new AbortController();
-  state.client!.openStream(state.gameId, state.nodeId, onCoordinatorEvent, state.abort.signal).catch(() => {});
+  const ctrl = new AbortController();
+  state.abort = ctrl;
+  void (async () => {
+    let attempts = 0;
+    while (!ctrl.signal.aborted) {
+      try {
+        console.log("[app] connecting to coordinator stream…");
+        await state.client!.openStream(state.gameId, state.nodeId, onCoordinatorEvent, ctrl.signal);
+      } catch (e) {
+        if (!ctrl.signal.aborted) console.warn(`[app] stream error: ${(e as Error).message}`);
+      }
+      if (ctrl.signal.aborted) break;
+      attempts += 1;
+      const delay = Math.min(5000, 1000 * attempts);
+      console.log(`[app] coordinator stream dropped — reconnecting in ${delay}ms…`);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  })();
 }
 
 app.post("/local/game/create", async (_req: Request, res: Response) => {

@@ -38,8 +38,17 @@ export class CoordinatorClient {
   rematch(gameId: string) {
     return this.post(`/games/${gameId}/rematch`, {});
   }
-  postResult(nodeId: string, result: JobResult) {
-    return this.post(`/jobs/${result.jobId}/result`, { ...result, nodeId });
+  async postResult(nodeId: string, result: JobResult) {
+    let lastErr: unknown;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        return await this.post(`/jobs/${result.jobId}/result`, { ...result, nodeId });
+      } catch (e) {
+        lastErr = e;
+        await new Promise((r) => setTimeout(r, 800 * attempt));
+      }
+    }
+    throw lastErr;
   }
 
   // Opens the SSE stream and calls onEvent for each ServerEvent until aborted.
