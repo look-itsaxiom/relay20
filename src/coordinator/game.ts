@@ -134,6 +134,10 @@ export class GameRoom {
       this.pendingHistory = [...this.history, { askedBy: asker, question: p.text!, answer }];
       const jobId = this.nextId();
       this.pending.set(jobId, { kind: "analyze", askerSlot: asker });
+      // The strategist must only see the asker's OWN line of questioning (their
+      // questions about the OPPONENT's secret). The opponent's questions are about
+      // the asker's own secret and would mislead the suggestions, so filter them out.
+      const askerThread = this.pendingHistory.filter((q) => q.askedBy === asker);
       return [
         {
           kind: "broadcast",
@@ -141,7 +145,7 @@ export class GameRoom {
         },
         {
           kind: "routeJob",
-          job: { jobId, targetNodeId: this.players[asker]!.nodeId, payload: { kind: "analyze", history: this.pendingHistory } },
+          job: { jobId, targetNodeId: this.players[asker]!.nodeId, payload: { kind: "analyze", history: askerThread } },
         },
       ];
     }

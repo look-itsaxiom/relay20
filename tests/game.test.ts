@@ -149,6 +149,28 @@ describe("GameRoom", () => {
     expect(broadcasts(fx).map((e) => e.type)).toContain("analysis"); // soft analysis emitted
   });
 
+  it("feeds a player's strategist ONLY their own questions, not the opponent's", () => {
+    const room = start();
+    // P1 completes a full turn (ask -> answer -> analyze); turn passes to P2.
+    const p1ask = room.action("nodeA", "ask", "Is it a pet?");
+    const p1answer = routes(p1ask)[0].jobId;
+    const afterP1 = room.jobResult({ jobId: p1answer, ok: true, latencyMs: 1, data: { kind: "answer", answer: "Yes" } });
+    const p1analyze = routes(afterP1)[0].jobId;
+    room.jobResult({ jobId: p1analyze, ok: true, latencyMs: 1, data: { kind: "analyze", candidates: [], followups: [], note: "" } });
+    expect(room.turn).toBe("P2");
+
+    // P2 asks; the analyze job routed to P2 must contain ONLY P2's question,
+    // never P1's "Is it a pet?".
+    const p2ask = room.action("nodeB", "ask", "Is it made of metal?");
+    const p2answer = routes(p2ask)[0].jobId;
+    const afterP2 = room.jobResult({ jobId: p2answer, ok: true, latencyMs: 1, data: { kind: "answer", answer: "No" } });
+    const analyzeJob = routes(afterP2)[0];
+    expect(analyzeJob.payload.kind).toBe("analyze");
+    const hist = (analyzeJob.payload as any).history as { askedBy: string; question: string }[];
+    expect(hist.every((q) => q.askedBy === "P2")).toBe(true);
+    expect(hist.map((q) => q.question)).toEqual(["Is it made of metal?"]);
+  });
+
   it("rejects an action when it is not your turn", () => {
     const room = start();
     expect(() => room.action("nodeB", "ask", "Is it alive?")).toThrow();
